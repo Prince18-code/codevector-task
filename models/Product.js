@@ -21,4 +21,5 @@ const productSchema = new mongoose.Schema({
 
 productSchema.index({ category: 1, createdAt: -1 });
 
-module.exports = mongoose.model('Product', productSchema);
+// Third argument me explicitly collection ka naam 'products' enforce kar do
+module.exports = mongoose.model('Product', productSchema, 'products');
