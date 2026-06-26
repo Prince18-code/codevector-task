@@ -1,74 +1,68 @@
-require('dotenv').config(); // .env file load karne ke liye
+require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const path = require('path');
+const Product = require('./models/Product');
+
 const app = express();
+const PORT = process.env.PORT || 3000;
 
-app.use(express.json());
-
-// Express ko batao ki hum EJS template engine use kar rahe hain views ke liye
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
-// MongoDB Connection via .env
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
 mongoose.connect(process.env.MONGO_URI)
-    .then(() => console.log("⚡ MongoDB Connected Successfully!"))
-    .catch(err => console.error("❌ Database Connection Error:", err));
+    .then(() => console.log('MongoDB connection established successfully.'))
+    .catch(err => console.error('MongoDB connection error:', err));
 
-// Product Model Setup
-const Product = mongoose.model('Product', new mongoose.Schema({
-    name: String,
-    category: String,
-    price: Number
-}, { timestamps: true }));
-
-// 🏠 1. HOME ROUTE: Live URL par jaate hi seedha HTML/UI kholega
-app.get('/', (req, res) => {
-    res.render('index');
-});
-
-// 📡 2. MAIN API ROUTE: Browse, Filter, aur Cursor Pagination Logic
-app.get('/api/products', async (req, res) => {
+app.get('/', async (req, res) => {
     try {
-        const limit = parseInt(req.query.limit) || 20; // Ek page me 20 products
-        const { category, next_cursor } = req.query;
+        const limit = parseInt(req.query.limit) || 10;
+        const category = req.query.category || 'All';
+        const nextCursor = req.query.nextCursor;
 
         let query = {};
-
-        // Category Filter logic
-        if (category) {
+        if (category !== 'All') {
             query.category = category;
         }
 
-        // CURSOR LOGIC: Agar frontend se next_cursor aaya hai, 
-        // toh database se us timestamp se sirf PURANA data mangwao ($lt = Less Than)
-        if (next_cursor) {
-            query.createdAt = { $lt: new Date(next_cursor) };
+        if (nextCursor) {
+            query.createdAt = { $lt: new Date(nextCursor) };
         }
 
-        // DB Query execution: sort Newest First (-1) aur limit lagao
         const products = await Product.find(query)
-            .sort({ createdAt: -1 }) 
+            .sort({ createdAt: -1 })
             .limit(limit);
 
-        // Agla cursor ready karo (Is current list ke sabse aakhri item ka createdAt timestamp)
-        let nextCursor = null;
-        if (products.length === limit) {
-            nextCursor = products[products.length - 1].createdAt;
+        let hasNextPage = false;
+        let lastTimestamp = null;
+
+        if (products.length > 0) {
+            lastTimestamp = products[products.length - 1].createdAt;
+            
+            let nextPageQuery = { ...query };
+            nextPageQuery.createdAt = { $lt: lastTimestamp };
+            
+            const nextProduct = await Product.findOne(nextPageQuery).sort({ createdAt: -1 });
+            if (nextProduct) {
+                hasNextPage = true;
+            }
         }
 
-        // Response send karo
-        res.json({
-            success: true,
-            count: products.length,
+        res.render('index', {
             products,
-            next_cursor: nextCursor
+            category,
+            limit,
+            nextCursor: hasNextPage ? lastTimestamp.toISOString() : null
         });
-
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        console.error('Error fetching products:', error);
+        res.status(500).send('Internal Server Error');
     }
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 Complete Product live on http://localhost:${PORT}`));
+app.listen(PORT, () => {
+    console.log(`Server is running smoothly on port ${PORT}`);
+});
