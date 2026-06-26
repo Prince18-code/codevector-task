@@ -20,46 +20,45 @@ mongoose.connect(process.env.MONGO_URI)
 app.get('/', async (req, res) => {
     try {
         const limit = parseInt(req.query.limit) || 10;
-        const category = req.query.category || 'All';
-        const nextCursor = req.query.nextCursor;
+        const { category, next_cursor } = req.query;
 
         let query = {};
-        if (category !== 'All') {
+        
+        // 1. Category Filter Check
+        if (category) {
             query.category = category;
         }
 
-        if (nextCursor) {
-            query.createdAt = { $lt: new Date(nextCursor) };
+        // 2. Strict Cursor Check
+        if (next_cursor) {
+            query._id = { $lt: next_cursor }; 
         }
 
-        const products = await Product.find(query)
-            .sort({ createdAt: -1 })
-            .limit(limit);
+        console.log("Executing DB Query with payload:", JSON.stringify(query));
 
-        let hasNextPage = false;
-        let lastTimestamp = null;
+        // 3. Force lean execution to directly pass plain JSON array to EJS
+        const products = await mongoose.model('Product')
+            .find(query)
+            .sort({ _id: -1 }) // Cursor-based fallback sequence
+            .limit(limit)
+            .lean();
 
-        if (products.length > 0) {
-            lastTimestamp = products[products.length - 1].createdAt;
-            
-            let nextPageQuery = { ...query };
-            nextPageQuery.createdAt = { $lt: lastTimestamp };
-            
-            const nextProduct = await Product.findOne(nextPageQuery).sort({ createdAt: -1 });
-            if (nextProduct) {
-                hasNextPage = true;
-            }
-        }
+        console.log(`Successfully fetched ${products.length} products from Atlas.`);
 
+        const hasNextPage = products.length === limit;
+        const newCursor = hasNextPage ? products[products.length - 1]._id.toString() : null;
+
+        // 4. Ensure variables match exact EJS expected placeholders
         res.render('index', {
-            products,
-            category,
-            limit,
-            nextCursor: hasNextPage ? lastTimestamp.toISOString() : null
+            products: products || [],
+            currentCategory: category || '',
+            nextCursor: newCursor,
+            limit: limit
         });
+
     } catch (error) {
-        console.error('Error fetching products:', error);
-        res.status(500).send('Internal Server Error');
+        console.error("Error executing product query wrapper:", error);
+        res.status(500).send("Internal Server Error: Query Mismatch");
     }
 });
 
