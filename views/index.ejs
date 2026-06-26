@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Product Browser</title>
+</head>
+<body style="font-family: sans-serif; padding: 20px;">
+    <h1>Product Browser</h1>
+    
+    <select id="categoryFilter" onchange="loadProducts(true)" style="padding: 10px; font-size: 16px;">
+        <option value="">All Categories</option>
+        <option value="Electronics">Electronics</option>
+        <option value="Clothing">Clothing</option>
+        <option value="Books">Books</option>
+        <option value="Home & Kitchen">Home & Kitchen</option>
+        <option value="Sports">Sports</option>
+    </select>
+
+    <div id="productsContainer" style="margin-top: 20px;"></div>
+
+    <button id="loadMoreBtn" onclick="loadProducts(false)" style="display: none; margin-top: 20px; padding: 10px 20px; font-size: 16px; cursor: pointer;">
+        Load More
+    </button>
+
+    <script>
+        let nextCursor = null; // Pichle page ke last item ka timestamp save rakhne ke liye
+
+        async function loadProducts(resetList = false) {
+            const category = document.getElementById('categoryFilter').value;
+            const loadBtn = document.getElementById('loadMoreBtn');
+            
+            // API URL build karna
+            let url = `/api/products?limit=20&category=${category}`;
+            
+            // Agar normal scroll (Load More) ho raha hai aur cursor available hai
+            if (!resetList && nextCursor) {
+                url += `&next_cursor=${nextCursor}`;
+            }
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                const container = document.getElementById('productsContainer');
+                if (resetList) container.innerHTML = ''; // Nayi category aane par screen saaf karo
+
+                // Loop chala kar ek-ek product ko UI me append (joḍna) karna
+                data.products.forEach(p => {
+                    container.innerHTML += `
+                        <div style="border: 1px solid black; padding: 10px; margin-bottom: 5px; background: #fafafa;">
+                            <h3 style="margin: 0;">${p.name} - $${p.price}</h3>
+                            <p style="margin: 5px 0 0 0; color: #555;">Category: ${p.category} | Created At: ${new Date(p.createdAt).toLocaleString()}</p>
+                        </div>
+                    `;
+                });
+
+                // Agla cursor update karo jo backend se mila hai
+                nextCursor = data.next_cursor;
+                
+                // Agar aur data bacha hai toh button dikhao, nahi toh chhupa do
+                loadBtn.style.display = nextCursor ? 'block' : 'none';
+
+            } catch (error) {
+                console.error("Error loading products:", error);
+            }
+        }
+
+        // Jab page pehli baar khule toh automatic data load ho jaye
+        loadProducts(true);
+    </script>
+</body>
+</html>
