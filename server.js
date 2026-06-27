@@ -42,7 +42,7 @@ app.get('/api/products', async (req, res) => {
             .lean();
  
         const hasNextPage = products.length > limit;
-        if (hasNextPage) products.pop(); // extra item hata do
+        if (hasNextPage) products.pop(); 
  
         const newCursor = hasNextPage ? products[products.length - 1]._id.toString() : null;
  
