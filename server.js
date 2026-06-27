@@ -17,7 +17,7 @@ mongoose.connect(process.env.MONGO_URI)
     .then(() => console.log('MongoDB connection established successfully.'))
     .catch(err => console.error('MongoDB connection error:', err));
  
-// ✅ FIX: Yeh JSON API route add karo — yahi fetch kar raha tha index.ejs ka JS
+
 app.get('/api/products', async (req, res) => {
     try {
         const limit = parseInt(req.query.limit) || 10;
@@ -38,7 +38,7 @@ app.get('/api/products', async (req, res) => {
         const products = await Product
             .find(query)
             .sort({ _id: -1 })
-            .limit(limit + 1)   // ✅ 1 extra fetch karo — hasNextPage detect karne ke liye
+            .limit(limit + 1)   
             .lean();
  
         const hasNextPage = products.length > limit;
@@ -48,7 +48,7 @@ app.get('/api/products', async (req, res) => {
  
         console.log(`Fetched ${products.length} products. hasNextPage: ${hasNextPage}`);
  
-        // ✅ JSON response bhejo (HTML nahi)
+       
         res.json({
             products,
             next_cursor: newCursor,
@@ -61,7 +61,7 @@ app.get('/api/products', async (req, res) => {
     }
 });
  
-// HTML page serve karne ke liye root route
+
 app.get('/', (req, res) => {
     res.render('index');
 });
